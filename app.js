@@ -11,8 +11,8 @@ var server = net.createServer(function (socket) {
     socket.once('data', function (msg) {
         console.log('  ** START **');
         var message = msg.toString()
-        console.log('<< From client to proxy ', message);
         var [METHOD, address] = message.split("\n")[0].split(" ")
+        console.log('<< From client to proxy ', address);
         var auth = message.search('Proxy-Authorization: Basic ')
         if (auth > 0) {
             let data = message.substring(auth).split(" ").pop();
