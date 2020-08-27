@@ -27,3 +27,8 @@ Following DEBUG scopes are possible:
 - proxy:log:<client address>
 - proxy:status
 - proxy:status:<client address>
+
+## :warning: Don't use in production
+- This is not a complete proxy server , many rings and bells are not there
+- Use for testing and learning pupose only
+
