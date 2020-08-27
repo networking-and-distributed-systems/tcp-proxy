@@ -1,78 +1,39 @@
 var net = require('net');
 var LOCAL_PORT = parseInt(process.env.PROXY_PORT) || 3131;
-if (process.env.PRODUCTION) console.log = () => { }
-var users = {
-    kaka: 'mama',
-    local: 'pc',
-    "": ""
-}
-var connected = new Set
+var log = require('debug')("proxy:log")
+var error = require('debug')("error")
+
 var server = net.createServer(function (socket) {
+    var log = require('debug')("proxy:log:" + `${socket.remoteAddress}:${socket.remotePort}`)
+    var error = require('debug')("error:" + `${socket.remoteAddress}:${socket.remotePort}`)
+    log(` connected via TCP`);
+    socket.once('close', () => log(` disconnected via TCP`))
+    socket.on('error', e => error(`  got Error:${e.code}`))
     socket.once('data', function (msg) {
-        console.log('  ** START **');
-        var message = msg.toString()
+        var message = msg.toString();
         var [METHOD, address] = message.split("\n")[0].split(" ")
-        console.log('<< From client to proxy ', address);
-        var auth = message.search('Proxy-Authorization: Basic ')
-        if (auth > 0) {
-            let data = message.substring(auth).split(" ").pop();
-            let buff = new Buffer(data, 'base64');
-            let [user, password] = buff.toString('ascii').split(":");
-            if (connected.has(user))
-                console.log("A request from " + user);
-            else {
-                if (user in users && password === users[user]) {
-                    console.log(`${user} is authroized now!`)
-                }
-                else {
-                    console.log("Unauthorized user " + user + " diconnected!")
-                    socket.write(`HTTP/1.1 401 Unauthorized
-
-`)
-                    return
-                }
-                connected.add(user)
-                console.log("New User " + user + 'connected!')
-            }
-        } else {
-            socket.write(`HTTP/1.1 407 Proxy Authentication
-Proxy-Authenticate: Basic realm="Access to the internal site"
-
-`)
-            console.log("::<< From proxy to client 407 Proxy Authentication")
-            return
-        }
         var [ipaddress, port] = address.split(":")
+        log(` requested ${METHOD} for ${address}`);
         if (METHOD !== 'CONNECT') {
-
-            socket.write(`HTTP/1.1  400 Bad Request
-Proxy-Authenticate: Basic realm="Access to the internal site"
-
-`)
-            console.log("::<< From proxy to client 400 Bad Request")
+            error(` bad request method ${METHOD} for ${address}`)
+            socket.end(`HTTP/1.1  400 Bad Request\nContent-Type:text/html\n\n<center><h1>400 Bad Request</h1><hr>upgrade to ssl<br><h6>from Your Proxy Server</h6></center>\n\n`)
             return
+        } else {
+            var serviceSocket = new net.Socket();
+            serviceSocket.connect(parseInt(port), ipaddress, function () {
+                log(` connected to ${address}`);
+                socket.write(`HTTP/1.1 200 OK\n\n`)
+                socket.pipe(serviceSocket)
+                serviceSocket.pipe(socket)
+            });
+            serviceSocket.once('close', () => log(` disconnected from ${address}`))
+            serviceSocket.on('error', e => {
+                error(` client ${address} got Error:${e.code}`)
+                socket.end(`HTTP/1.1 503 Service Unavailable\n\n`);
+                serviceSocket.end()
+            })
         }
-        var serviceSocket = new net.Socket();
-        serviceSocket.connect(parseInt(port), ipaddress, function () {
-            socket.write(`HTTP/1.1 200 OK
-
-`)
-            console.log("::<< From proxy to client 200")
-            socket.pipe(serviceSocket)
-            serviceSocket.pipe(socket)
-        });
-        serviceSocket.on('error', (...a) => {
-            console.log(a);
-            socket.write(`HTTP/1.1 503 Service Unavailable
-
-            `)
-            console.log("::<< From proxy to client 503 Service Unavailable")
-        })
-        socket.on('error', (...a) => {
-            console.log(a);
-        })
     });
 });
 
-server.listen(LOCAL_PORT);
-console.log("TCP server accepting connection on port: " + LOCAL_PORT);
+server.listen(LOCAL_PORT, '0.0.0.0', (port, host) => log(`Proxy Server listening at ${'0.0.0.0'}:${LOCAL_PORT}`));
