@@ -14,9 +14,16 @@ var server = net.createServer(function (socket) {
     socket.once('close', () => log(` disconnected via TCP`) || status("disconnected"))
     socket.on('error', e => error(`  got Error:${e.code}`))
     socket.once('data', function (msg) {
-        var message = msg.toString();
-        var [METHOD, address] = message.split("\n")[0].split(" ")
-        var [ipaddress, port] = address.split(":")
+        try {
+            var message = msg.toString();
+            var [METHOD, address] = message.split("\n")[0].split(" ")
+            var [ipaddress, port] = address.split(":")
+        }
+        catch (e) {
+            error(` malformed request`)
+            socket.end(`HTTP/1.1  400 Bad Request\n\nthis will be reported!\n\n`)
+            return
+        }
         log(` requested ${METHOD} for ${address}`);
         if (METHOD !== 'CONNECT') {
             error(` bad request method ${METHOD} for ${address}`)

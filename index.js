@@ -17,6 +17,7 @@ process.env.PROXY_IP = host
 if (filter)
     process.env.DEBUG = '*:' + filter + ':*'
 else {
+    if (verbose > 3) verbose = 3
     var levels = ['proxy:status', 'proxy:status:*', 'proxy:log:*,proxy:log', 'error,error:*']
     process.env.DEBUG = levels.slice(0, verbose).join()
 }
